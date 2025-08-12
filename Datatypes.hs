@@ -16,6 +16,7 @@ class Iterable i where
 class
     Iterable c =>
     Collection c where
+
     clear       :: Op (c a) ()
     empty       :: Op (c a) Bool
     contains    :: Eq a => a -> Op (c a) Bool
@@ -24,6 +25,7 @@ class
     delete      :: Eq a => a -> Op (c a) ()
     peek        :: Op (c a) a
     remove      :: Op (c a) a
+
     empty = liftM (0 ==) size
     delete x = delete' [] x where
                delete' reserved toDelete =
@@ -33,23 +35,30 @@ class
                     else
                         delete' (e : reserved) x
 
-{- List -}
-type List = []
+class
+    Collection l =>
+    List l where
 
-newtype ListIter a = ListIter { lst :: List a }
+    at :: Int -> Op (l a) a
+    removeAt :: Int -> Op (l a) a
+    insertAt :: Int -> Op (l a) ()
 
-instance Iterator ListIter where
-    next =  liftM lst get >>= \(x:xs) -> -- unsafe!
-            put (ListIter xs) >> return x
+class
+    Collection s =>
+    Stack s where
 
-instance Iterable List where
-    type Iter List = ListIter
-    iterator = liftM ListIter get
+    push :: a -> Op (s a) ()
+    pop  :: Op (s a) a
 
-instance Collection List where
-    clear = put []
-    contains x = liftM (elem x) get
-    size = liftM length get
-    add x = modify (x :)
-    peek = liftM head get
-    remove = get >>= \(x:xs) -> put xs >> return x
+    push = add
+    pop  = remove
+
+class
+    Collection q =>
+    Queue q where
+
+    enqueue :: a -> Op (q a) ()
+    dequeue :: Op (q a) a
+
+    enqueue = add
+    dequeue = remove
