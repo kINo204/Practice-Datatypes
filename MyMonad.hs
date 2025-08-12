@@ -1,6 +1,7 @@
 module MyMonad (
-    Monad(..), when, unless, mapM, mapM_, replicateM, replicateM_, liftM,
-    Op(..), (>>>), put, get, modify,
+    Monad(..),
+    Op(..), (>>>), nul, put, get, modify,
+    when, unless, mapM, mapM_, replicateM, replicateM_, liftM,
 ) where
 
 import Prelude hiding (Monad(..), mapM, mapM_)
@@ -12,38 +13,39 @@ class Monad m where
     x >> y = x >>= const y
 
 
-{- Writer monad -}
-data Log a = Log a [String] deriving Show
-
-instance Monad Log where
-    return x = Log x []
-    Log x ms >>= f = Log y (ms ++ m) where Log y m = f x
-
-annotate :: String -> a -> Log a
-annotate m x = Log () [m] >> return x
+instance Monad Maybe where
+    return = Just
+    Nothing >>= _ = Nothing
+    Just x >>= f = f x
 
 
 {- State monad -}
 -- The name "State" is inaccurate, using "Op"(operation) instead.
-newtype Op s a = Op { run :: s -> (s, a) }
+newtype Op s a = Op { run :: s -> (s, Maybe a) }
 
-(>>>) :: s -> Op s a -> (s, a)
+(>>>) :: s -> Op s a -> (s, Maybe a)
 s >>> op = run op s
 infixr 0 >>>
 
 instance Monad (Op s) where
-    return x = Op run where run s = (s, x)
-    Op r0 >>= f = Op r where
-        r s = run (f x') s' where (s', x') = r0 s
+    return x = Op run where run s = (s, Just x)
+    Op r0 >>= f = Op r
+            where r s0 = let (s1, r1) = r0 s0
+                         in case r1 of
+                            Nothing -> (s1, Nothing) -- stays at last state
+                            Just x1 -> s1 >>> f x1
+
+nul :: Op s a
+nul = Op (\s -> (s, Nothing))
 
 put :: s -> Op s ()
-put s = Op (const (s, ()))
+put s = Op (const (s, Just ()))
 
 get :: Op s s
-get = Op (\s -> (s, s))
+get = Op (\s -> (s, Just s))
 
 modify :: (s -> s) -> Op s ()
-modify f = Op (\s -> (f s, ()))
+modify f = Op (\s -> (f s, Just ()))
 
 
 {- Monadic control structures -}
